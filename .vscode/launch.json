@@ -1,0 +1,28 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: Текущий файл",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}\\App.py",
+            "console": "externalTerminal",
+            "justMyCode": true,
+            "args": [
+                "-f_table",
+                "DataSets\\Таблица_Ф_имен.xlsx",
+                "-k_table",
+                "DataSets\\Таблица_К_имен_и_норм.xlsx",
+                "-b_table",
+                "DataSets\\Таблица_В_временных_характеристик.xlsx",
+                "-ch_table",
+                "DataSets\\Таблица_Ч_имен_и_числовых_норм.xlsx",
+                "-input",
+                "DataSets\\Пример_исх_данных_для_ВГУ.xlsx"
+            ],
+        }
+    ]
+}
