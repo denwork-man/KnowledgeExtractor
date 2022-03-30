@@ -9,7 +9,7 @@
             "type": "python",
             "request": "launch",
             "program": "${workspaceFolder}\\App.py",
-            "console": "externalTerminal",
+            "console": "integratedTerminal",
             "justMyCode": true,
             "args": [
                 "-f_table",
