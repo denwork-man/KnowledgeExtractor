@@ -46,29 +46,34 @@ class KnowledgeExtractor:
             if(isValid == True):
                 validColumns.append(col)
 
-        # ddd
+        # обработка колонок
         for validColumnName in validColumns:
             roughLikenessRow = {}
             outItemsKeys = []
             higherItemsKeys = []
             lowerItemsKeys = []
-            for index, currentValue in self.inputData[validColumnName].items():
-                kNamesAndNorms = self.kNameAndNormTable['название'].values()
-                chNameAndDigitNorms = self.chNameAndDigitNormTable['название'].values()
 
-                # если колонка есть в числовых характеристиках
-                if validColumnName in chNameAndDigitNorms:
-                    minValue = self.kNameAndNormTableDf.loc[self.kNameAndNormTableDf['название'] == validColumnName]['Ниж гр нормы']
-                    maxValue = self.kNameAndNormTableDf.loc[self.kNameAndNormTableDf['название'] == validColumnName]['Верх гран нормы']
+            kNamesAndNorms = self.kNameAndNormTable['название'].values()
+            chNameAndDigitNorms = self.chNameAndDigitNormTable['название'].values()
+
+            # если колонка есть в числовых характеристиках
+            if validColumnName in chNameAndDigitNorms:
+                for index, currentValue in self.inputData[validColumnName].items():
+                    key = [k for k, v in self.chNameAndDigitNormTable['название'].items() if v == validColumnName][0]
+                    
+                    minValue = self.chNameAndDigitNormTable['Ниж гр нормы'][key]
+                    maxValue = self.chNameAndDigitNormTable['Верх гран нормы'][key]
+
                     if currentValue < minValue:
-                        roughLikenessRow['lower'] = currentValue
+                        lowerItemsKeys.append(currentValue)
                     elif currentValue > minValue:
-                        roughLikenessRow['higher'] = currentValue
+                        higherItemsKeys.append(currentValue)
                     else:
                         continue
 
-                # если колонка есть в качественных характеристиках
-                elif validColumnName in kNamesAndNorms:
+            # если колонка есть в качественных характеристиках
+            elif validColumnName in kNamesAndNorms:
+                for index, currentValue in self.inputData[validColumnName].items():
                     key = [k for k, v in self.kNameAndNormTable['название'].items() if v == validColumnName][0]
                     normValue = self.kNameAndNormTable['Норма (если есть)'][key]
                     if not pandas.notnull(normValue):
@@ -78,8 +83,10 @@ class KnowledgeExtractor:
                         outItemsKeys.append(index + 2) # index == 0 это индекс в массиве, +2 что бы он стал как индекс в excel
                     else:
                         continue
-                else:
-                    break
+
+            # если нет ни в качественных ни в числовых характеристиках
+            else:
+                continue
 
             if len(outItemsKeys) != 0 or len(higherItemsKeys) != 0 or len(lowerItemsKeys) != 0:
                 roughLikenessRow['ObsNm'] = validColumnName
@@ -92,12 +99,8 @@ class KnowledgeExtractor:
                 roughLikenessData.append(roughLikenessRow)
 
         print(roughLikenessData)
-
-        # workbook = xlsxwriter.Workbook('RoughLikenessTable.xlsx')
-        # worksheet = workbook.add_worksheet()
-        # worksheet.write(row, column, item)
-        # row += 1
-        # workbook.close()
+        self.__listOfDictToExcel('Output\\RoughLikenessTable.xlsx', roughLikenessData)
+        
     
     def createSplittingUnNormTable(self):
         """
@@ -114,12 +117,14 @@ class KnowledgeExtractor:
         return (allCount - isNullCount) > precentCount
     
     
-    def __clearValues(self, data):
-        return data.dropna().map(lambda item: item.rstrip()) # удаляет пустые и у оставшихся удаляет пробелы в конце
-    
     def __getNanValuesCount(self, data):
         nanCount = 0
         for item in data:
             if not pandas.notnull(item):
                 nanCount += 1
         return nanCount
+
+
+    def __listOfDictToExcel(self, filePath, data):
+        output = pandas.DataFrame(data)
+        output.to_excel(filePath, index=False)
