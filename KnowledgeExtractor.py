@@ -1,5 +1,4 @@
 import pandas
-import xlsxwriter
 
 class KnowledgeExtractor:
     # конструктор
