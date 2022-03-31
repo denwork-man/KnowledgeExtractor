@@ -98,6 +98,7 @@ class KnowledgeExtractor:
                 roughLikenessData.append(roughLikenessRow)
 
         print(roughLikenessData)
+        self.roughLikenessTable = roughLikenessData
         self.__listOfDictToExcel('Output\\RoughLikenessTable.xlsx', roughLikenessData)
         
     
