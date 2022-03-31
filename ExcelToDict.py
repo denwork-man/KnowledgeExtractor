@@ -6,55 +6,43 @@ from functools import singledispatch
 
 @singledispatch
 def GetStructuredData(inputDF: pd.DataFrame) -> dict:
-    validColumns = []
-
+    validColumns = list(filter(lambda item: 'Unnamed' not in item, inputDF.columns.to_list()))
     objects = {}
     counter = 0
-    for item in inputDF.columns:
-        attr_name = item.strip()
-        # print(type(item), " : ", attr_name)
-        validColumns.append(item)
-        # print(inputDF[item][0])
 
     for row in inputDF.index:
+        attributes = {}
 
-        atributes: dict
-        atributes = {}
         for item in validColumns:
             attr_name = item.strip()
-            # if isinstance(inputDF[item][row], float):
-            print("\t\t", type(inputDF[item][row]), " : ", inputDF[item][row], pd.isna(inputDF[item][row]))
-
             value = int(0)
-            if not pd.isna(inputDF[item][row]):
 
-                if isinstance(inputDF[item][row], np.float64):
-                    # print(type(inputDF[item][row]), ': ', inputDF[item][row])
-                    value = inputDF[item][row].item()
-                    print(type(value), ': ', value)
-                else:
-                    if isinstance(inputDF[item][row], np.int64):
-                        value = inputDF[item][row].item()
-                        print(type(value), ': ', value)
-                        # print(type(inputDF[item][row]), ': ', inputDF[item][row])
-                    else:
-                        value = inputDF[item][row]
-                if isinstance(value, str):
-                    value = value.strip()
-                    listt = value.split('; ')
-                    if len(listt) > 1:
-                        value = listt
-                    if isinstance(value, list):
-                        # print('\t\tLIST ', type(value))
-                        for i in range(0, len(value)):
-                            # print('\t\t\t\t ', i, ') "', value[i],'"')
-                            value[i] = value[i].strip()
-                            # print('\t\t\tAfterStrip\n\t\t\t\t_', i, ') "', value[i],'"')
+            elem = inputDF[item][row]
 
-                # print('__\t',type(value), ': ', value)
-                atributes[attr_name] = value
+            # пропускаем пустые значения
+            if pd.isna(elem):
+                continue
 
-        objects[str(row + 1)] = atributes
+            # если значение числовое
+            if isinstance(elem, np.float64) or isinstance(elem, np.int64):
+                value = elem.item()
+
+            # если значение строковое
+            elif isinstance(elem, str):
+                listt = list(map(lambda item: item.strip(), elem.split(';')))
+                if len(listt) > 1:
+                    value = listt
+                elif len(listt) == 1:
+                    value = listt[0]
+            
+            # если значение другого типа
+            else:
+                value = elem
+
+            attributes[attr_name] = value
+
+        objects[str(row + 1)] = attributes
+    print(objects)
     return objects
 
 @GetStructuredData.register
@@ -68,15 +56,18 @@ GetStructureCount возвращает dict подобный по виду и с
 'значение' -- количество значений в нём 
 """
 def GetStructureCount(inputDF: pd.DataFrame) -> dict:
-    validColumns ={}
+    validColumns = {}
     for item in inputDF.count().index:
+        if 'Unnamed' in item:
+            continue
+
         attr_name = item.strip()
-        # print(type(item), " : ", attr_name)
         validColumns[attr_name] = int(inputDF.count()[item])
+    
     return validColumns
 
 
-def testFunctionsAbove(inpFileName : str = "C:\\Users\\DinDin\\Downloads\\Telegram Desktop\\Шалфеева_файлы\\примерИсхДан (для ВГу).xls"):
+def testFunctionsAbove(inpFileName : str = "DataSets\\Пример_исх_данных_для_ВГУ.xlsx"):
     inpDataFrame = pd.read_excel(inpFileName, sheet_name="Первичный осмотр")
     array = GetStructuredData(inpDataFrame)
 
