@@ -3,7 +3,7 @@ import sys
 import os
 import argparse
 from KnowledgeExtractor import KnowledgeExtractor as KExtractor
-
+from loguru import logger
 
 def initArguments():
     """
@@ -32,12 +32,12 @@ def isValidResourcesPath(args):
     for filePath in pathes:
         exist = os.path.exists(f"{getFullPath(filePath)}")
         if(exist == False):
-            print(f"Не найден Excel файл по переданному пути: {filePath}")
+            logger.warning(f"Не найден Excel файл по переданному пути: {filePath}")
             return False
 
         _, ext = os.path.splitext(filePath)
         if(ext != '.xlsx' and  ext != '.xls'):
-            print("Расширение файла должно быть .xlsx или .xls")
+            logger.warning("Расширение файла должно быть .xlsx или .xls")
             return False
     
     return True
@@ -45,22 +45,29 @@ def isValidResourcesPath(args):
 
 # Точка входа приложения
 if __name__ == '__main__':
-    args = initArguments()
-    isValidArgs = isValidResourcesPath(args)
-    if(isValidArgs == False):
-        exit()
+    try:
+        args = initArguments()
+        isValidArgs = isValidResourcesPath(args)
+        if(isValidArgs == False):
+            exit()
+            pass
 
-    kExtractor = KExtractor(
-        inputFilePath=getFullPath(args.input),
-        fTableFilePath=getFullPath(args.f_table),
-        kTableFilePath=getFullPath(args.k_table),
-        bTableFilePath=getFullPath(args.b_table),
-        chTableFilePath=getFullPath(args.ch_table),
-    )
+        kExtractor = KExtractor(
+            inputFilePath=getFullPath(args.input),
+            fTableFilePath=getFullPath(args.f_table),
+            kTableFilePath=getFullPath(args.k_table),
+            bTableFilePath=getFullPath(args.b_table),
+            chTableFilePath=getFullPath(args.ch_table),
+        )
+        # Шаг № 1
+        kExtractor.createRoughLikenessTable()
 
-    # Шаг № 1
-    kExtractor.createRoughLikenessTable()
+    except SystemExit as e:
+        # игнор исключения (игнор так как метод exit() выкидывает эту ошибку при завершении python скрипта)
+        pass
+    except BaseException as e:
+        logger.exception(f'Во время работы приложения произошла непредвиденная ошибка')
 
 
 # Строка запуска программы в консоли
-# python App.py -f_table DataSets\Таблица_Ф_имен.xlsx -k_table DataSets\Таблица_К_имен_и_норм.xlsx -b_table DataSets\Таблица_В_временных_характеристик.xlsx -ch_table DataSets\Таблица_Ч_имен_и_числовых_норм.xlsx -input DataSets\Пример_исх_данных_для_ВГУ.xlsx
+# python App.py -f_table DataSets\Таблица_Ф_имен.xlsx -k_table DataSets\Таблица_К_имен_и_норм.xlsx -b_table DataSets\Таблица_В_временных_характеристик.xlsx -ch_table DataSets\Таблица_Ч_имен_и_числовых_норм.xlsx -input DataSets\Пример_исх_данных_для_ВГУ_v2.xls

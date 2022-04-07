@@ -1,111 +1,121 @@
 import pandas
+from loguru import logger
+
 
 class KnowledgeExtractor:
     # конструктор
     def __init__(self, inputFilePath, fTableFilePath, kTableFilePath, bTableFilePath, chTableFilePath):
-        # запись данных Excel таблиц в поля класса
-        inputData = pandas.read_excel(inputFilePath, sheet_name="Первичный осмотр").to_dict()
-        fTable = pandas.read_excel(fTableFilePath, sheet_name="Лист1").to_dict()
-        kTable = pandas.read_excel(kTableFilePath, sheet_name="Лист1").to_dict()
-        bTable = pandas.read_excel(bTableFilePath, sheet_name="Лист1").to_dict()
-        chTable = pandas.read_excel(chTableFilePath, sheet_name="Лист1").to_dict()
-        
-        self.inputData = self.__trimDictKeys(inputData)
-        self.fNameTable = self.__trimDictKeys(fTable)
-        self.kNameAndNormTable = self.__trimDictKeys(kTable)
-        self.bTimeCharacteristicTable = self.__trimDictKeys(bTable)
-        self.chNameAndDigitNormTable = self.__trimDictKeys(chTable)
+        try:
+            # запись данных Excel таблиц в поля класса
+            inputData = pandas.read_excel(inputFilePath, sheet_name="Первичный осмотр").to_dict()
+            fTable = pandas.read_excel(fTableFilePath, sheet_name="Лист1").to_dict()
+            kTable = pandas.read_excel(kTableFilePath, sheet_name="Лист1").to_dict()
+            bTable = pandas.read_excel(bTableFilePath, sheet_name="Лист1").to_dict()
+            chTable = pandas.read_excel(chTableFilePath, sheet_name="Лист1").to_dict()
+            
+            self.inputData = self.__trimDictKeys(inputData)
+            self.fNameTable = self.__trimDictKeys(fTable)
+            self.kNameAndNormTable = self.__trimDictKeys(kTable)
+            self.bTimeCharacteristicTable = self.__trimDictKeys(bTable)
+            self.chNameAndDigitNormTable = self.__trimDictKeys(chTable)
+            
+            logger.info(f'Входные файлы успешно считаны')
+        except BaseException as e:
+            logger.exception(f'Во время чтения данных с файлов произошла ошибка')
 
 
     def createRoughLikenessTable(self):
-        """
-        Шаг № 1 - получение таблицы ROUGH LIKENESS
-        """
-        worksheetRow = 0
-        worksheetColumn = 0
-        validColumns = []
-        roughLikenessData = []
-        aviableColumns = [
-            "БольЖив.Локализ",
-            "Боль.Интенсивн",
-            "Рвота.Характеристики",
-            "Температура тела",
-            "ВлажностьЯзыка",
-            "Налет на языке",
-            "ПрочиеЖКТжалобы",
-            "Чувствит-ть при пальп",
-            "Чувствит-ть.Локализ",
-            "УЗИ-СтенкиЖП, мм",
-            "Лечен.Эфф",
-            "Гематокрит, %",
-            "Лейкоциты, 10^9/л",
-            "Состояние",
-            "Билирубин общ, мкмоль/л",
-            "Тошнота.Время",
-        ]
+        """ Шаг № 1 - получение таблицы ROUGH LIKENESS """
+        try:
+            worksheetRow = 0
+            worksheetColumn = 0
+            validColumns = []
+            roughLikenessData = []
+            aviableColumns = [
+                "БольЖив.Локализ",
+                "Боль.Интенсивн",
+                "Рвота.Характеристики",
+                "Температура тела",
+                "ВлажностьЯзыка",
+                "Налет на языке",
+                "ПрочиеЖКТжалобы",
+                "Чувствит-ть при пальп",
+                "Чувствит-ть.Локализ",
+                "УЗИ-СтенкиЖП, мм",
+                "Лечен.Эфф",
+                "Гематокрит, %",
+                "Лейкоциты, 10^9/л",
+                "Состояние",
+                "Билирубин общ, мкмоль/л",
+                "Тошнота.Время",
+            ]
 
-        # отбор тех колонок у которых значений заполнено более 40%
-        for col in aviableColumns:
-            columnData = self.inputData[col]
-            isValid = self.__isFillInPercent(columnData.values(), 40)
-            if(isValid == True):
-                validColumns.append(col)
+            # отбор тех колонок у которых значений заполнено более 40%
+            for col in aviableColumns:
+                columnData = self.inputData[col]
+                isValid = self.__isFillInPercent(columnData.values(), 40)
+                if(isValid == True):
+                    validColumns.append(col)
 
-        # обработка колонок
-        for validColumnName in validColumns:
-            roughLikenessRow = {}
-            outItemsKeys = []
-            higherItemsKeys = []
-            lowerItemsKeys = []
+            # обработка колонок
+            for validColumnName in validColumns:
+                roughLikenessRow = {}
+                outItemsKeys = []
+                higherItemsKeys = []
+                lowerItemsKeys = []
 
-            kNamesAndNorms = self.kNameAndNormTable['Название'].values()
-            chNameAndDigitNorms = self.chNameAndDigitNormTable['Название'].values()
+                kNamesAndNorms = self.kNameAndNormTable['Название'].values()
+                chNameAndDigitNorms = self.chNameAndDigitNormTable['Название'].values()
 
-            # если колонка есть в числовых характеристиках
-            if validColumnName in chNameAndDigitNorms:
-                for index, currentValue in self.inputData[validColumnName].items():
-                    key = [k for k, v in self.chNameAndDigitNormTable['Название'].items() if v == validColumnName][0]
-                    
-                    minValue = self.chNameAndDigitNormTable['Ниж гр нормы'][key]
-                    maxValue = self.chNameAndDigitNormTable['Верх гран нормы'][key]
+                # если колонка есть в числовых характеристиках
+                if validColumnName in chNameAndDigitNorms:
+                    for index, currentValue in self.inputData[validColumnName].items():
+                        key = [k for k, v in self.chNameAndDigitNormTable['Название'].items() if v == validColumnName][0]
+                        
+                        minValue = self.chNameAndDigitNormTable['Ниж гр нормы'][key]
+                        maxValue = self.chNameAndDigitNormTable['Верх гран нормы'][key]
 
-                    if currentValue < minValue:
-                        lowerItemsKeys.append(currentValue)
-                    elif currentValue > minValue:
-                        higherItemsKeys.append(currentValue)
-                    else:
-                        continue
+                        if currentValue < minValue:
+                            lowerItemsKeys.append(currentValue)
+                        elif currentValue > minValue:
+                            higherItemsKeys.append(currentValue)
+                        else:
+                            continue
 
-            # если колонка есть в качественных характеристиках
-            elif validColumnName in kNamesAndNorms:
-                for index, currentValue in self.inputData[validColumnName].items():
-                    key = [k for k, v in self.kNameAndNormTable['Название'].items() if v == validColumnName][0]
-                    normValue = self.kNameAndNormTable['Норма (если есть)'][key]
-                    if not pandas.notna(normValue) or not pandas.notna(currentValue):
-                        continue
+                # если колонка есть в качественных характеристиках
+                elif validColumnName in kNamesAndNorms:
+                    for index, currentValue in self.inputData[validColumnName].items():
+                        key = [k for k, v in self.kNameAndNormTable['Название'].items() if v == validColumnName][0]
+                        normValue = self.kNameAndNormTable['Норма (если есть)'][key]
+                        if not pandas.notna(normValue) or not pandas.notna(currentValue):
+                            continue
 
-                    if currentValue not in normValue:
-                        outItemsKeys.append(index + 2) # index == 0 это индекс в массиве, +2 что бы он стал как индекс в excel
-                    else:
-                        continue
+                        if currentValue not in normValue:
+                            outItemsKeys.append(index + 2) # index == 0 это индекс в массиве, +2 что бы он стал как индекс в excel
+                        else:
+                            continue
 
-            # если нет ни в качественных ни в числовых характеристиках
-            else:
-                continue
+                # если нет ни в качественных ни в числовых характеристиках
+                else:
+                    continue
 
-            if len(outItemsKeys) != 0 or len(higherItemsKeys) != 0 or len(lowerItemsKeys) != 0:
-                roughLikenessRow['ObsNm'] = validColumnName
-                roughLikenessRow['Out'] = ','.join(map(str, outItemsKeys)) or ''
-                roughLikenessRow['Q-Out'] = len(outItemsKeys) or ''
-                roughLikenessRow['Higher'] = ','.join(map(str, higherItemsKeys)) or ''
-                roughLikenessRow['Q-Higher'] = len(higherItemsKeys) or ''
-                roughLikenessRow['Lower'] = ','.join(map(str, lowerItemsKeys)) or ''
-                roughLikenessRow['Q-Lower'] = len(lowerItemsKeys) or ''
-                roughLikenessData.append(roughLikenessRow)
+                if len(outItemsKeys) != 0 or len(higherItemsKeys) != 0 or len(lowerItemsKeys) != 0:
+                    roughLikenessRow['ObsNm'] = validColumnName
+                    roughLikenessRow['Out'] = ','.join(map(str, outItemsKeys)) or ''
+                    roughLikenessRow['Q-Out'] = len(outItemsKeys) or ''
+                    roughLikenessRow['Higher'] = ','.join(map(str, higherItemsKeys)) or ''
+                    roughLikenessRow['Q-Higher'] = len(higherItemsKeys) or ''
+                    roughLikenessRow['Lower'] = ','.join(map(str, lowerItemsKeys)) or ''
+                    roughLikenessRow['Q-Lower'] = len(lowerItemsKeys) or ''
+                    roughLikenessData.append(roughLikenessRow)
 
-        print(roughLikenessData)
-        self.roughLikenessTable = roughLikenessData
-        self.__listOfDictToExcel('Output\\RoughLikenessTable.xlsx', roughLikenessData)
+            print(roughLikenessData)
+            self.roughLikenessTable = roughLikenessData
+            self.__listOfDictToExcel('Output\\RoughLikenessTable.xlsx', roughLikenessData)
+            
+            logger.info(f'Таблица ROUGH LIKENESS успешно сформирована')
+        except BaseException as e:
+            logger.exception(f'Во время получение таблицы ROUGH LIKENESS произошла ошибка')
         
     
     def createSplittingUnNormTable(self):
