@@ -7,17 +7,11 @@ class KnowledgeExtractor:
     def __init__(self, inputFilePath, fTableFilePath, kTableFilePath, bTableFilePath, chTableFilePath):
         try:
             # запись данных Excel таблиц в поля класса
-            inputData = pandas.read_excel(inputFilePath, sheet_name="Первичный осмотр").to_dict()
-            fTable = pandas.read_excel(fTableFilePath, sheet_name="Лист1").to_dict()
-            kTable = pandas.read_excel(kTableFilePath, sheet_name="Лист1").to_dict()
-            bTable = pandas.read_excel(bTableFilePath, sheet_name="Лист1").to_dict()
-            chTable = pandas.read_excel(chTableFilePath, sheet_name="Лист1").to_dict()
-            
-            self.inputData = self.__trimDictKeys(inputData)
-            self.fNameTable = self.__trimDictKeys(fTable)
-            self.kNameAndNormTable = self.__trimDictKeys(kTable)
-            self.bTimeCharacteristicTable = self.__trimDictKeys(bTable)
-            self.chNameAndDigitNormTable = self.__trimDictKeys(chTable)
+            self.inputData = self.__importData(inputFilePath, "Первичный осмотр")
+            self.fNameTable = self.__importData(fTableFilePath, "Лист1")
+            self.kNameAndNormTable = self.__importData(kTableFilePath, "Лист1")
+            self.bTimeCharacteristicTable = self.__importData(bTableFilePath, "Лист1")
+            self.chNameAndDigitNormTable = self.__importData(chTableFilePath, "Лист1")
             
             logger.info(f'Входные файлы успешно считаны')
         except BaseException as e:
@@ -145,9 +139,16 @@ class KnowledgeExtractor:
         output = pandas.DataFrame(data)
         output.to_excel(filePath, index=False)
 
+
     def __trimDictKeys(self, dictData: dict) -> dict:
         newDict = {}
         for dictKey, dictValues in dictData.items():
             newDict[dictKey.strip()] = dictValues
         
         return newDict
+
+
+    def __importData(self, filePath: str, sheetName: str) -> dict:
+        data = pandas.read_excel(filePath, sheet_name=sheetName).to_dict()
+        resultDict = self.__trimDictKeys(data)
+        return resultDict
