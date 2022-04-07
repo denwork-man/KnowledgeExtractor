@@ -36,8 +36,8 @@ def isValidResourcesPath(args):
             return False
 
         _, ext = os.path.splitext(filePath)
-        if(ext != '.xlsx'):
-            print("Расширение файла должно быть .xlsx")
+        if(ext != '.xlsx' and  ext != '.xls'):
+            print("Расширение файла должно быть .xlsx или .xls")
             return False
     
     return True
