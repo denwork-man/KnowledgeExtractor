@@ -61,6 +61,9 @@ if __name__ == '__main__':
         )
         # Шаг № 1
         kExtractor.createRoughLikenessTable()
+        
+        # Шаг № 2
+        kExtractor.createSplittingUnNormTable()
 
     except SystemExit as e:
         # игнор исключения (игнор так как метод exit() выкидывает эту ошибку при завершении python скрипта)

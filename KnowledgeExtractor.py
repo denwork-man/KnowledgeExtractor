@@ -116,8 +116,46 @@ class KnowledgeExtractor:
         """
         Шаг № 2
         """
-        pass
+        #Находим наиболее рейтинговый признак  
+        rowMaxQOut = self.__getRowMaxQOut()
+        kNamesAndNorms = self.kNameAndNormTable['название'].values()
+        chNameAndDigitNorms = self.chNameAndDigitNormTable['название'].values()
+        if rowMaxQOut['ObsNm'] in kNamesAndNorms: #Если признак качественный
+            """
+            Шаг № 2.1
+            """
+            CategoriesClustersData = []
+            for nRowQQut in rowMaxQOut['Out'].split(','):  #Для каждой строки
+                categories = self.inputData[rowMaxQOut['ObsNm']][int(nRowQQut)-2]
+                
+                for categorie in categories.split(';'): #Для каждого значения из перечня
 
+                    if len(CategoriesClustersData) == 0: #Если таблица пуста
+                        self.__addRowCategoriesClustersData(CategoriesClustersData,categorie,nRowQQut) #Добавь значение
+
+                    else:   #Иначе ищи среди существующих значений
+                        isFind = False
+                        for nCategoriesRow in range(len(CategoriesClustersData)):
+                            if CategoriesClustersData[nCategoriesRow]["Val"] == categorie: #Если нашел совпадение
+                                CategoriesClustersData[nCategoriesRow]["Out"] = CategoriesClustersData[nCategoriesRow]["Out"]+","+nRowQQut #Допиши номер строки
+                                CategoriesClustersData[nCategoriesRow]["Count"] += 1 #Увеличь счетчик
+                                isFind = True 
+                                break
+                        if not isFind: #Если не нашел
+                            self.__addRowCategoriesClustersData(CategoriesClustersData,categorie,nRowQQut) #Добавь значение
+
+            for CategoriesClustersRow in CategoriesClustersData: #Для каждого значения категории
+                CategoriesClustersRow["%"] = CategoriesClustersRow["Count"]/len(rowMaxQOut['Out'].split(','))*100 #Рассчитай % вхождения в выборку
+
+            self.__printTable(CategoriesClustersData) #Выведи таблицу
+            self.CategoriesClustersTable = CategoriesClustersData #Сохрани таблицу
+            self.__listOfDictToExcel('Output\\SplittingUnNormCategories.xlsx', CategoriesClustersData) #Выгрузи таблицу
+        
+        elif rowMaxQOut['ObsNm'] in chNameAndDigitNorms: #Если признак числовой
+            """
+            Шаг № 2.2
+            """
+			
 
     def __isFillInPercent(self, data, precent):
         allCount = len(data)
@@ -152,3 +190,26 @@ class KnowledgeExtractor:
         data = pandas.read_excel(filePath, sheet_name=sheetName).to_dict()
         resultDict = self.__trimDictKeys(data)
         return resultDict
+
+
+    def __getRowMaxQOut(self):
+        maxQOut = 0
+        rowMaxQOut = {}
+        for row in self.roughLikenessTable:
+            if row['Q-Out'] > maxQOut:
+               maxQOut = row['Q-Out']
+               rowMaxQOut = row
+        return rowMaxQOut
+
+
+    def __printTable(self,table):
+        for nomRow in range(len(table)):
+            print("{0}:{1}".format(nomRow,table[nomRow]))
+			
+
+    def __addRowCategoriesClustersData(self,CategoriesClustersData,categorie,nRowQQut):
+        clustersRow = { "Val":categorie,
+                        "Out":nRowQQut,
+                        "Count":1,
+                        "%":0,}
+        CategoriesClustersData.append(clustersRow)
