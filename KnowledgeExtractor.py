@@ -1,3 +1,5 @@
+from ast import Continue
+from operator import le
 import pandas
 from loguru import logger
 
@@ -73,9 +75,9 @@ class KnowledgeExtractor:
                             continue
 
                         if currentValue < minValue:
-                            lowerItemsKeys.append(currentValue)
+                            lowerItemsKeys.append(index + 2)
                         elif currentValue > maxValue:
-                            higherItemsKeys.append(currentValue)
+                            higherItemsKeys.append(index + 2)
                         else:
                             continue
 
@@ -121,44 +123,112 @@ class KnowledgeExtractor:
         Шаг № 2
         """
         #Находим наиболее рейтинговый признак  
-        rowMaxQOut = self.__getRowMaxQOut()
-        kNamesAndNorms = self.kNameAndNormTable['название'].values()
-        chNameAndDigitNorms = self.chNameAndDigitNormTable['название'].values()
+        rowMaxQOut, rowMaxNumOut = self.__getRowMaxQOut()
+        chNameAndDigitNorms = self.chNameAndDigitNormTable['Название'].values()
+        kNamesAndNorms = self.kNameAndNormTable['Название'].values()
+
+        if rowMaxQOut == '':
+            return
         if rowMaxQOut['ObsNm'] in kNamesAndNorms: #Если признак качественный
             """
             Шаг № 2.1
             """
-            CategoriesClustersData = []
-            for nRowQQut in rowMaxQOut['Out'].split(','):  #Для каждой строки
-                categories = self.inputData[rowMaxQOut['ObsNm']][int(nRowQQut)-2]
-                
-                for categorie in categories.split(';'): #Для каждого значения из перечня
+            try:
+                CategoriesClustersData = []
+                for nRowQQut in rowMaxQOut['Out'].split(','):  #Для каждой строки
+                    categories = self.inputData[rowMaxQOut['ObsNm']][int(nRowQQut)-2]
+                    
+                    for categorie in categories.split(';'): #Для каждого значения из перечня
 
-                    if len(CategoriesClustersData) == 0: #Если таблица пуста
-                        self.__addRowCategoriesClustersData(CategoriesClustersData,categorie,nRowQQut) #Добавь значение
-
-                    else:   #Иначе ищи среди существующих значений
-                        isFind = False
-                        for nCategoriesRow in range(len(CategoriesClustersData)):
-                            if CategoriesClustersData[nCategoriesRow]["Val"] == categorie: #Если нашел совпадение
-                                CategoriesClustersData[nCategoriesRow]["Out"] = CategoriesClustersData[nCategoriesRow]["Out"]+","+nRowQQut #Допиши номер строки
-                                CategoriesClustersData[nCategoriesRow]["Count"] += 1 #Увеличь счетчик
-                                isFind = True 
-                                break
-                        if not isFind: #Если не нашел
+                        if len(CategoriesClustersData) == 0: #Если таблица пуста
                             self.__addRowCategoriesClustersData(CategoriesClustersData,categorie,nRowQQut) #Добавь значение
 
-            for CategoriesClustersRow in CategoriesClustersData: #Для каждого значения категории
-                CategoriesClustersRow["%"] = CategoriesClustersRow["Count"]/len(rowMaxQOut['Out'].split(','))*100 #Рассчитай % вхождения в выборку
+                        else:   #Иначе ищи среди существующих значений
+                            isFind = False
+                            for nCategoriesRow in range(len(CategoriesClustersData)):
+                                if CategoriesClustersData[nCategoriesRow]["Val"] == categorie: #Если нашел совпадение
+                                    CategoriesClustersData[nCategoriesRow]["Out"] = CategoriesClustersData[nCategoriesRow]["Out"]+","+nRowQQut #Допиши номер строки
+                                    CategoriesClustersData[nCategoriesRow]["Count"] += 1 #Увеличь счетчик
+                                    isFind = True 
+                                    break
+                            if not isFind: #Если не нашел
+                                self.__addRowCategoriesClustersData(CategoriesClustersData,categorie,nRowQQut) #Добавь значение
 
-            self.__printTable(CategoriesClustersData) #Выведи таблицу
-            self.CategoriesClustersTable = CategoriesClustersData #Сохрани таблицу
-            self.__listOfDictToExcel('Output\\SplittingUnNormCategories.xlsx', CategoriesClustersData) #Выгрузи таблицу
-        
-        elif rowMaxQOut['ObsNm'] in chNameAndDigitNorms: #Если признак числовой
+                for CategoriesClustersRow in CategoriesClustersData: #Для каждого значения категории
+                    CategoriesClustersRow["%"] = CategoriesClustersRow["Count"]/len(rowMaxQOut['Out'].split(','))*100 #Рассчитай % вхождения в выборку
+
+                self.__printTable(CategoriesClustersData) #Выведи таблицу
+                self.CategoriesClustersTable = CategoriesClustersData #Сохрани таблицу
+                self.__listOfDictToExcel('Output\\SplittingUnNormCategories.xlsx', CategoriesClustersData) #Выгрузи таблицу
+
+                logger.info(f'Таблица SplittingUnNormCategories успешно сформирована (2.1)')
+            except BaseException as e:
+                logger.exception(f'Во время получение таблицы SplittingUnNormCategories произошла ошибка (2.1)')
+
+        if rowMaxNumOut == '':
+            return
+        if rowMaxNumOut['ObsNm'] in chNameAndDigitNorms: #Если признак числовой
             """
             Шаг № 2.2
             """
+            try:
+                NumbersClustersData = []
+                validArray = []
+                twoPercArray = []
+                halfPercArray = []
+                plusHalfPercArray = []
+                borderValue = 0
+                higherArray = rowMaxNumOut['Higher'].split(',')
+                lowerArray = rowMaxNumOut['Lower'].split(',')
+
+                if len(lowerArray) > len(higherArray) :
+                    validArray = lowerArray
+                    key = [k for k, v in self.chNameAndDigitNormTable['Название'].items() if v == rowMaxNumOut['ObsNm']][0]
+                    borderValue = self.chNameAndDigitNormTable['Ниж гр нормы'][key]
+                else:
+                    validArray = higherArray
+                    key = [k for k, v in self.chNameAndDigitNormTable['Название'].items() if v == rowMaxNumOut['ObsNm']][0]
+                    borderValue = self.chNameAndDigitNormTable['Верх гран нормы'][key]
+                
+                for elem in validArray:
+                    number = self.inputData[rowMaxNumOut['ObsNm']][int(elem)]
+                    if not pandas.notna(number):
+                        continue 
+                    twoPercBorder = borderValue * 0.02
+                    halfBorder = borderValue * 0.5
+
+                    if number > borderValue and number <= borderValue + twoPercBorder:
+                        twoPercArray.append(number)
+                    elif number > borderValue + twoPercBorder and number <= borderValue + halfBorder:
+                        halfPercArray.append(number)
+                    elif number > borderValue + halfBorder:
+                        plusHalfPercArray.append(number)
+
+                NumbersClustersData.append({
+                    'Val':'> Граница, но <= Граница + 2%', 
+                    'Out':','.join(map(str, twoPercArray)) or '',
+                    'Count':len(twoPercArray), 
+                    '%' : len(twoPercArray)/(rowMaxNumOut['Q-Higher'] + rowMaxNumOut['Q-Lower'])*100 
+                })
+                NumbersClustersData.append({
+                    'Val':'> Граница + 2%, но <= Граница + 50%', 
+                    'Out':','.join(map(str, halfPercArray)) or '',
+                    'Count':len(halfPercArray), 
+                    '%' : len(halfPercArray)/(rowMaxNumOut['Q-Higher'] + rowMaxNumOut['Q-Lower'])*100 
+                })
+                NumbersClustersData.append({
+                    'Val':'> Граница + 50%', 
+                    'Out':','.join(map(str, plusHalfPercArray)) or '',
+                    'Count':len(plusHalfPercArray), 
+                    '%' : len(plusHalfPercArray)/(rowMaxNumOut['Q-Higher'] + rowMaxNumOut['Q-Lower'])*100 
+                })
+                print(NumbersClustersData)
+                self.numbersClusterTable = NumbersClustersData
+                self.__listOfDictToExcel('Output\\SplittingUnNumbersClusters.xlsx', NumbersClustersData)
+
+                logger.info(f'Таблица SplittingUnNumbersClusters успешно сформирована (2.2)')
+            except BaseException as e:
+                logger.exception(f'Во время получение таблицы SplittingUnNumbersClusters произошла ошибка (2.2)')
 			
 
     def __isFillInPercent(self, data, precent):
@@ -199,11 +269,20 @@ class KnowledgeExtractor:
     def __getRowMaxQOut(self):
         maxQOut = 0
         rowMaxQOut = {}
+        maxNumOut = 0
+        rowMaxNumOut = {}
         for row in self.roughLikenessTable:
-            if row['Q-Out'] > maxQOut:
+            if row['Q-Out'] == '':
+               qLower = 0 if row['Q-Lower'] == '' else row['Q-Lower']
+               qHigher = 0 if row['Q-Higher'] == '' else row['Q-Higher']
+               qSum = qHigher + qLower
+               if int(qSum) > int(maxNumOut):
+                   maxNumOut = qSum
+                   rowMaxNumOut = row
+            elif row['Q-Out'] > maxQOut:
                maxQOut = row['Q-Out']
                rowMaxQOut = row
-        return rowMaxQOut
+        return rowMaxQOut, rowMaxNumOut
 
 
     def __printTable(self,table):
@@ -217,3 +296,5 @@ class KnowledgeExtractor:
                         "Count":1,
                         "%":0,}
         CategoriesClustersData.append(clustersRow)
+
+        
