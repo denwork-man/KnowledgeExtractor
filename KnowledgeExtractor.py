@@ -1,5 +1,3 @@
-from ast import Continue
-from operator import le
 import pandas
 from loguru import logger
 
@@ -119,58 +117,54 @@ class KnowledgeExtractor:
         
     
     def createSplittingUnNormTable(self):
-        """
-        Шаг № 2
-        """
-        #Находим наиболее рейтинговый признак  
+        """ Шаг № 2 """
+        # Находим наиболее рейтинговый признак  
         rowMaxQOut, rowMaxNumOut = self.__getRowMaxQOut()
         chNameAndDigitNorms = self.chNameAndDigitNormTable['Название'].values()
         kNamesAndNorms = self.kNameAndNormTable['Название'].values()
 
-        if rowMaxQOut == '':
+        if rowMaxQOut == {}:
             return
-        if rowMaxQOut['ObsNm'] in kNamesAndNorms: #Если признак качественный
-            """
-            Шаг № 2.1
-            """
+
+        if rowMaxQOut['ObsNm'] in kNamesAndNorms: # Если признак качественный
+            """ Шаг № 2.1 """
             try:
                 CategoriesClustersData = []
-                for nRowQQut in rowMaxQOut['Out'].split(','):  #Для каждой строки
+                for nRowQQut in rowMaxQOut['Out'].split(','):  # Для каждой строки
                     categories = self.inputData[rowMaxQOut['ObsNm']][int(nRowQQut)-2]
                     
-                    for categorie in categories.split(';'): #Для каждого значения из перечня
+                    for categorie in categories.split(';'): # Для каждого значения из перечня
 
-                        if len(CategoriesClustersData) == 0: #Если таблица пуста
-                            self.__addRowCategoriesClustersData(CategoriesClustersData,categorie,nRowQQut) #Добавь значение
+                        if len(CategoriesClustersData) == 0: # Если таблица пуста
+                            self.__addRowCategoriesClustersData(CategoriesClustersData,categorie,nRowQQut) # Добавь значение
 
-                        else:   #Иначе ищи среди существующих значений
+                        else:   # Иначе ищи среди существующих значений
                             isFind = False
                             for nCategoriesRow in range(len(CategoriesClustersData)):
-                                if CategoriesClustersData[nCategoriesRow]["Val"] == categorie: #Если нашел совпадение
-                                    CategoriesClustersData[nCategoriesRow]["Out"] = CategoriesClustersData[nCategoriesRow]["Out"]+","+nRowQQut #Допиши номер строки
-                                    CategoriesClustersData[nCategoriesRow]["Count"] += 1 #Увеличь счетчик
+                                if CategoriesClustersData[nCategoriesRow]["Val"] == categorie: # Если нашел совпадение
+                                    CategoriesClustersData[nCategoriesRow]["Out"] = CategoriesClustersData[nCategoriesRow]["Out"] + "," + nRowQQut # Допиши номер строки
+                                    CategoriesClustersData[nCategoriesRow]["Count"] += 1 # Увеличь счетчик
                                     isFind = True 
                                     break
-                            if not isFind: #Если не нашел
-                                self.__addRowCategoriesClustersData(CategoriesClustersData,categorie,nRowQQut) #Добавь значение
+                            if not isFind: # Если не нашел
+                                self.__addRowCategoriesClustersData(CategoriesClustersData, categorie, nRowQQut) # Добавь значение
 
-                for CategoriesClustersRow in CategoriesClustersData: #Для каждого значения категории
-                    CategoriesClustersRow["%"] = CategoriesClustersRow["Count"]/len(rowMaxQOut['Out'].split(','))*100 #Рассчитай % вхождения в выборку
+                for CategoriesClustersRow in CategoriesClustersData: # Для каждого значения категории
+                    CategoriesClustersRow["%"] = CategoriesClustersRow["Count"] / len(rowMaxQOut['Out'].split(',')) * 100 # Рассчитай % вхождения в выборку
 
-                self.__printTable(CategoriesClustersData) #Выведи таблицу
-                self.CategoriesClustersTable = CategoriesClustersData #Сохрани таблицу
-                self.__listOfDictToExcel('Output\\SplittingUnNormCategories.xlsx', CategoriesClustersData) #Выгрузи таблицу
+                self.__printTable(CategoriesClustersData) # Выведи таблицу
+                self.CategoriesClustersTable = CategoriesClustersData # Сохрани таблицу
+                self.__listOfDictToExcel('Output\\SplittingUnNormCategories.xlsx', CategoriesClustersData) # Выгрузи таблицу
 
                 logger.info(f'Таблица SplittingUnNormCategories успешно сформирована (2.1)')
             except BaseException as e:
                 logger.exception(f'Во время получение таблицы SplittingUnNormCategories произошла ошибка (2.1)')
 
-        if rowMaxNumOut == '':
+        if rowMaxNumOut == {}:
             return
-        if rowMaxNumOut['ObsNm'] in chNameAndDigitNorms: #Если признак числовой
-            """
-            Шаг № 2.2
-            """
+
+        if rowMaxNumOut['ObsNm'] in chNameAndDigitNorms: # Если признак числовой
+            """ Шаг № 2.2 """
             try:
                 NumbersClustersData = []
                 validArray = []
@@ -181,19 +175,20 @@ class KnowledgeExtractor:
                 higherArray = rowMaxNumOut['Higher'].split(',')
                 lowerArray = rowMaxNumOut['Lower'].split(',')
 
-                if len(lowerArray) > len(higherArray) :
+                key = [k for k, v in self.chNameAndDigitNormTable['Название'].items() if v == rowMaxNumOut['ObsNm']][0]
+
+                if len(lowerArray) > len(higherArray):
                     validArray = lowerArray
-                    key = [k for k, v in self.chNameAndDigitNormTable['Название'].items() if v == rowMaxNumOut['ObsNm']][0]
                     borderValue = self.chNameAndDigitNormTable['Ниж гр нормы'][key]
                 else:
                     validArray = higherArray
-                    key = [k for k, v in self.chNameAndDigitNormTable['Название'].items() if v == rowMaxNumOut['ObsNm']][0]
                     borderValue = self.chNameAndDigitNormTable['Верх гран нормы'][key]
                 
                 for elem in validArray:
                     number = self.inputData[rowMaxNumOut['ObsNm']][int(elem)]
                     if not pandas.notna(number):
-                        continue 
+                        continue
+
                     twoPercBorder = borderValue * 0.02
                     halfBorder = borderValue * 0.5
 
@@ -204,32 +199,21 @@ class KnowledgeExtractor:
                     elif number > borderValue + halfBorder:
                         plusHalfPercArray.append(number)
 
-                NumbersClustersData.append({
-                    'Val':'> Граница, но <= Граница + 2%', 
-                    'Out':','.join(map(str, twoPercArray)) or '',
-                    'Count':len(twoPercArray), 
-                    '%' : len(twoPercArray)/(rowMaxNumOut['Q-Higher'] + rowMaxNumOut['Q-Lower'])*100 
-                })
-                NumbersClustersData.append({
-                    'Val':'> Граница + 2%, но <= Граница + 50%', 
-                    'Out':','.join(map(str, halfPercArray)) or '',
-                    'Count':len(halfPercArray), 
-                    '%' : len(halfPercArray)/(rowMaxNumOut['Q-Higher'] + rowMaxNumOut['Q-Lower'])*100 
-                })
-                NumbersClustersData.append({
-                    'Val':'> Граница + 50%', 
-                    'Out':','.join(map(str, plusHalfPercArray)) or '',
-                    'Count':len(plusHalfPercArray), 
-                    '%' : len(plusHalfPercArray)/(rowMaxNumOut['Q-Higher'] + rowMaxNumOut['Q-Lower'])*100 
-                })
-                print(NumbersClustersData)
+                val = rowMaxNumOut['Q-Higher'] + rowMaxNumOut['Q-Lower']
+
+                self.__createNumbersClustersData(NumbersClustersData, '> Граница, но <= Граница + 2%', twoPercArray, val)
+                self.__createNumbersClustersData(NumbersClustersData, '> Граница + 2%, но <= Граница + 50%', halfPercArray, val)
+                self.__createNumbersClustersData(NumbersClustersData, '> Граница + 50%', plusHalfPercArray, val)
+
+                self.__printTable(NumbersClustersData)
+
                 self.numbersClusterTable = NumbersClustersData
                 self.__listOfDictToExcel('Output\\SplittingUnNumbersClusters.xlsx', NumbersClustersData)
 
                 logger.info(f'Таблица SplittingUnNumbersClusters успешно сформирована (2.2)')
             except BaseException as e:
                 logger.exception(f'Во время получение таблицы SplittingUnNumbersClusters произошла ошибка (2.2)')
-			
+		
 
     def __isFillInPercent(self, data, precent):
         allCount = len(data)
@@ -272,6 +256,8 @@ class KnowledgeExtractor:
         maxNumOut = 0
         rowMaxNumOut = {}
         for row in self.roughLikenessTable:
+
+            # Для численных значений у которых Q-Out отсутствует
             if row['Q-Out'] == '':
                qLower = 0 if row['Q-Lower'] == '' else row['Q-Lower']
                qHigher = 0 if row['Q-Higher'] == '' else row['Q-Higher']
@@ -279,9 +265,12 @@ class KnowledgeExtractor:
                if int(qSum) > int(maxNumOut):
                    maxNumOut = qSum
                    rowMaxNumOut = row
+
+            # Для качественных значений у которых есть Q-Out
             elif row['Q-Out'] > maxQOut:
                maxQOut = row['Q-Out']
                rowMaxQOut = row
+
         return rowMaxQOut, rowMaxNumOut
 
 
@@ -290,11 +279,17 @@ class KnowledgeExtractor:
             print("{0}:{1}".format(nomRow,table[nomRow]))
 			
 
-    def __addRowCategoriesClustersData(self,CategoriesClustersData,categorie,nRowQQut):
+    def __addRowCategoriesClustersData(self, CategoriesClustersData, categorie, nRowQQut):
         clustersRow = { "Val":categorie,
                         "Out":nRowQQut,
                         "Count":1,
                         "%":0,}
         CategoriesClustersData.append(clustersRow)
 
-        
+    def __createNumbersClustersData(self, NumbersClustersData, val, array, precentVal):
+        NumbersClustersData.append({
+            'Val': val, 
+            'Out':','.join(map(str, array)) or '',
+            'Count':len(array), 
+            '%' : len(array) / (precentVal) * 100 
+        })
