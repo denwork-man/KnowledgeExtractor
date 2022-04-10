@@ -69,9 +69,12 @@ class KnowledgeExtractor:
                         minValue = self.chNameAndDigitNormTable['Ниж гр нормы'][key]
                         maxValue = self.chNameAndDigitNormTable['Верх гран нормы'][key]
 
+                        if not pandas.notna(normValue) or not pandas.notna(currentValue):
+                            continue
+
                         if currentValue < minValue:
                             lowerItemsKeys.append(currentValue)
-                        elif currentValue > minValue:
+                        elif currentValue > maxValue:
                             higherItemsKeys.append(currentValue)
                         else:
                             continue
@@ -81,6 +84,7 @@ class KnowledgeExtractor:
                     for index, currentValue in self.inputData[validColumnName].items():
                         key = [k for k, v in self.kNameAndNormTable['Название'].items() if v == validColumnName][0]
                         normValue = self.kNameAndNormTable['Норма (если есть)'][key]
+                       
                         if not pandas.notna(normValue) or not pandas.notna(currentValue):
                             continue
 
