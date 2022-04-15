@@ -7,11 +7,11 @@ class KnowledgeExtractor:
     def __init__(self, inputFilePath, fTableFilePath, kTableFilePath, bTableFilePath, chTableFilePath):
         try:
             # запись данных Excel таблиц в поля класса
-            self.inputData = self.__importData(inputFilePath, "Первичный осмотр")
-            self.fNameTable = self.__importData(fTableFilePath, "Лист1")
-            self.kNameAndNormTable = self.__importData(kTableFilePath, "Лист1")
-            self.bTimeCharacteristicTable = self.__importData(bTableFilePath, "Лист1")
-            self.chNameAndDigitNormTable = self.__importData(chTableFilePath, "Лист1")
+            self.inputData = self.__importData(inputFilePath)
+            self.fNameTable = self.__importData(fTableFilePath)
+            self.kNameAndNormTable = self.__importData(kTableFilePath)
+            self.bTimeCharacteristicTable = self.__importData(bTableFilePath)
+            self.chNameAndDigitNormTable = self.__importData(chTableFilePath)
             
             logger.info(f'Входные файлы успешно считаны')
         except BaseException as e:
@@ -46,6 +46,10 @@ class KnowledgeExtractor:
 
             # отбор тех колонок у которых значений заполнено более 40%
             for col in aviableColumns:
+                if col not in self.inputData.keys():
+                    logger.warning(f"Во входных данных не была найдена колонка: \"{col}\". Проверьте ее существование и корректность названия.")
+                    continue
+
                 columnData = self.inputData[col]
                 isValid = self.__isFillInPercent(columnData.values(), 40)
                 if(isValid == True):
@@ -58,6 +62,14 @@ class KnowledgeExtractor:
                 higherItemsKeys = []
                 lowerItemsKeys = []
 
+                if 'Название' not in self.kNameAndNormTable.keys():
+                    logger.warning(f"Завершение работы. В таблице \"Таблица_К_имен_и_норм\" не была найдена колонка: \"Название\". Проверьте ее существование и корректность написания.")
+                    return
+
+                if 'Название' not in self.chNameAndDigitNormTable.keys():
+                    logger.warning(f"Завершение работы. В таблице \"Таблица_Ч_имен_и_числовых_норм\" не была найдена колонка: \"Название\". Проверьте ее существование и корректность написания.")
+                    return
+
                 kNamesAndNorms = self.kNameAndNormTable['Название'].values()
                 chNameAndDigitNorms = self.chNameAndDigitNormTable['Название'].values()
 
@@ -66,11 +78,26 @@ class KnowledgeExtractor:
                     for index, currentValue in self.inputData[validColumnName].items():
                         key = [k for k, v in self.chNameAndDigitNormTable['Название'].items() if v == validColumnName][0]
                         
+                        if 'Ниж гр нормы' not in self.chNameAndDigitNormTable.keys():
+                            logger.warning(f"Завершение работы. В таблице \"Таблица_Ч_имен_и_числовых_норм\" не была найдена колонка: \"Ниж гр нормы\". Проверьте ее существование и корректность написания.")
+                            return
+
+                        if 'Верх гран нормы' not in self.chNameAndDigitNormTable.keys():
+                            logger.warning(f"Завершение работы. В таблице \"Таблица_Ч_имен_и_числовых_норм\" не была найдена колонка: \"Верх гран нормы\". Проверьте ее существование и корректность написания.")
+                            return
+
                         minValue = self.chNameAndDigitNormTable['Ниж гр нормы'][key]
                         maxValue = self.chNameAndDigitNormTable['Верх гран нормы'][key]
 
                         if not pandas.notna(normValue) or not pandas.notna(currentValue):
                             continue
+                        
+                        if isinstance(currentValue, str) and 'нет' in currentValue.lower():
+                            continue
+                        
+                        currentValue = self.__validateDigitValue(currentValue)
+                        minValue = self.__validateDigitValue(minValue)
+                        maxValue = self.__validateDigitValue(maxValue)
 
                         if currentValue < minValue:
                             lowerItemsKeys.append(index + 2)
@@ -83,6 +110,11 @@ class KnowledgeExtractor:
                 elif validColumnName in kNamesAndNorms:
                     for index, currentValue in self.inputData[validColumnName].items():
                         key = [k for k, v in self.kNameAndNormTable['Название'].items() if v == validColumnName][0]
+                       
+                        if 'Норма (если есть)' not in self.kNameAndNormTable.keys():
+                            logger.warning(f"Завершение работы. В таблице \"Таблица_К_имен_и_норм\" не была найдена колонка: \"Норма (если есть)\". Проверьте ее существование и корректность написания.")
+                            return
+
                         normValue = self.kNameAndNormTable['Норма (если есть)'][key]
                        
                         if not pandas.notna(normValue) or not pandas.notna(currentValue):
@@ -97,6 +129,7 @@ class KnowledgeExtractor:
                 else:
                     continue
 
+                # если что-то собрали
                 if len(outItemsKeys) != 0 or len(higherItemsKeys) != 0 or len(lowerItemsKeys) != 0:
                     roughLikenessRow['ObsNm'] = validColumnName
                     roughLikenessRow['Out'] = ','.join(map(str, outItemsKeys)) or ''
@@ -107,8 +140,10 @@ class KnowledgeExtractor:
                     roughLikenessRow['Q-Lower'] = len(lowerItemsKeys) or ''
                     roughLikenessData.append(roughLikenessRow)
 
-            print(roughLikenessData)
+            self.__printTable(roughLikenessData)
+
             self.roughLikenessTable = roughLikenessData
+
             self.__listOfDictToExcel('Output\\RoughLikenessTable.xlsx', roughLikenessData)
             
             logger.info(f'Таблица ROUGH LIKENESS успешно сформирована')
@@ -185,12 +220,15 @@ class KnowledgeExtractor:
                     borderValue = self.chNameAndDigitNormTable['Верх гран нормы'][key]
                 
                 for elem in validArray:
-                    number = self.inputData[rowMaxNumOut['ObsNm']][int(elem)]
+                    number = self.inputData[rowMaxNumOut['ObsNm']][int(elem) - 2]
                     if not pandas.notna(number):
                         continue
 
                     twoPercBorder = borderValue * 0.02
                     halfBorder = borderValue * 0.5
+
+                    number = self.__validateDigitValue(number)
+                    borderValue = self.__validateDigitValue(borderValue)
 
                     if number > borderValue and number <= borderValue + twoPercBorder:
                         twoPercArray.append(number)
@@ -214,6 +252,26 @@ class KnowledgeExtractor:
             except BaseException as e:
                 logger.exception(f'Во время получение таблицы SplittingUnNumbersClusters произошла ошибка (2.2)')
 		
+
+    def __validateDigitValue(self, digit) -> float:
+        if isinstance(digit, (str)):
+            # Если значение строковое типа '3-4', то возвращаю наибольшее значение
+            if '-' in digit:
+                splitted = digit.split('-')
+                return float(self.__validateDigitValue(splitted[0])) if float(self.__validateDigitValue(splitted[0])) >= float(self.__validateDigitValue(splitted[1])) else float(self.__validateDigitValue(splitted[1]))
+            
+            # Если значение строковое типа '3,5'
+            elif ',' in digit:
+                return float(digit.replace(',', '.'))
+
+            # Если значение строковое типа '3'
+            else:
+                return float(digit)
+        elif isinstance(digit, (int, float)):
+            return float(digit)
+        else:
+            return float(digit)
+
 
     def __isFillInPercent(self, data, precent):
         allCount = len(data)
@@ -244,8 +302,8 @@ class KnowledgeExtractor:
         return newDict
 
 
-    def __importData(self, filePath: str, sheetName: str) -> dict:
-        data = pandas.read_excel(filePath, sheet_name=sheetName).to_dict()
+    def __importData(self, filePath: str) -> dict:
+        data = pandas.read_excel(filePath).to_dict()
         resultDict = self.__trimDictKeys(data)
         return resultDict
 
@@ -286,10 +344,11 @@ class KnowledgeExtractor:
                         "%":0,}
         CategoriesClustersData.append(clustersRow)
 
+
     def __createNumbersClustersData(self, NumbersClustersData, val, array, precentVal):
         NumbersClustersData.append({
             'Val': val, 
             'Out':','.join(map(str, array)) or '',
             'Count':len(array), 
-            '%' : len(array) / (precentVal) * 100 
+            '%' : round(len(array) / (precentVal) * 100, 2)
         })
