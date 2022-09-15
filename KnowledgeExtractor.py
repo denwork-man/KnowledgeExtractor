@@ -503,7 +503,7 @@ class KnowledgeExtractor:
                        "%": 0, }
         CategoriesClustersData.append(clustersRow)
     def __cleanUpString(selfself, string_0: str):
-        result = "".join(c for c in string_0 if c.isalpha()) + str(random.randint(-20, 20))
+        result = "".join(c for c in string_0 if c.isalpha())
         return result
 
     def __createNumbersClustersData(self, NumbersClustersData, val, array, precentVal):

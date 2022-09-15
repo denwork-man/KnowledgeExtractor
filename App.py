@@ -45,6 +45,7 @@ def isValidResourcesPath(args):
 
 # Точка входа приложения
 if __name__ == '__main__':
+    logger.info(f'KnowledgeExtractor запускается. Сейчас всё начнётся.')
     try:
         args = initArguments()
         isValidArgs = isValidResourcesPath(args)
