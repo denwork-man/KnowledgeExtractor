@@ -1,6 +1,7 @@
 import pandas
 from loguru import logger
 import pathlib
+import json
 import random
 
 
@@ -13,7 +14,11 @@ class KnowledgeExtractor:
                  kTableFilePath: str = ".\\DataSets\\Таблица_К_имен_и_норм.xlsx",
                  bTableFilePath: str = ".\\DataSets\\Таблица_В_временных_характеристик.xlsx",
                  chTableFilePath : str = ".\\DataSets\\Таблица_Ч_имен_и_числовых_норм.xlsx",
-                 outputDirPath: str = "Output"):
+                 outputDirPath: str = ".\\Output",
+                 outToExcel: bool = True,
+                 outToJson: bool = False):
+
+        logger.debug(f'Инициализация')
         try:
             # запись данных Excel таблиц в поля класса
             self.inputData = self.__importData(inputFilePath)
@@ -24,22 +29,59 @@ class KnowledgeExtractor:
 
             logger.info(f'Входные файлы успешно считаны')
         except BaseException as e:
-            logger.exception(f'Во время чтения данных с файлов произошла ошибка. Exception: {e}')
+            logger.exception(f'Во время чтения данных с файлов произошла ошибка')
+            return
 
         try:
-            pathlib.Path(outputDirPath).mkdir(parents=True, exist_ok=True)
+            path = pathlib.Path(outputDirPath)
+            if not path.exists():
+                logger.warning(f"Не найден путь выходной директории: {outputDirPath}. Создание пути.")
+            path.mkdir(parents=True, exist_ok=True)
         except BaseException as e:
-            logger.exception(f'Во время создания выходного каталога произошла ошибка. Exception: {e}')
+            logger.exception(f'Во время создания выходного каталога произошла ошибка')
+            return
 
-        self.chNameAndDigitNorms = self.chNameAndDigitNormTable['Название'].values()
+        if 'Название' not in self.kNameAndNormTable.keys():
+            logger.error(
+                f"Завершение работы. В таблице \"Таблица_К_имен_и_норм\" не была найдена колонка: \"Название\". Проверьте ее существование и корректность написания.")
+            return
+
+        if 'Название' not in self.chNameAndDigitNormTable.keys():
+            logger.error(
+                f"Завершение работы. В таблице \"Таблица_Ч_имен_и_числовых_норм\" не была найдена колонка: \"Название\". Проверьте ее существование и корректность написания.")
+            return
+
         self.kNamesAndNorms = self.kNameAndNormTable['Название'].values()
-        logger.info(f'Названия полей категориальных и числовых норм считаны')
-        # logger.debug(f"self.chNameAndDigitNormTable['Название'].values(): {self.chNameAndDigitNorms}")
-        # logger.debug(f"self.kNameAndNormTable['Название'].values(): {self.kNamesAndNorms}")
+        self.chNameAndDigitNorms = self.chNameAndDigitNormTable['Название'].values()
+
+        logger.info(f'Признаки в категориальных и числовых норм считаны')
+        logger.debug(f"self.chNameAndDigitNormTable['Название'].values(): {self.chNameAndDigitNorms}")
+        logger.debug(f"self.kNameAndNormTable['Название'].values(): {self.kNamesAndNorms}")
+
+        if 'Ниж гр нормы' not in self.chNameAndDigitNormTable.keys():
+            logger.error(
+                f"Завершение работы. В таблице \"Таблица_Ч_имен_и_числовых_норм\" не была найдена колонка: \"Ниж гр нормы\". Проверьте ее существование и корректность написания.")
+            return
+
+        if 'Верх гран нормы' not in self.chNameAndDigitNormTable.keys():
+            logger.error(
+                f"Завершение работы. В таблице \"Таблица_Ч_имен_и_числовых_норм\" не была найдена колонка: \"Верх гран нормы\". Проверьте ее существование и корректность написания.")
+            return
+
+        if 'Норма (если есть)' not in self.kNameAndNormTable.keys():
+            logger.error(
+                f"Завершение работы. В таблице \"Таблица_К_имен_и_норм\" не была найдена колонка: \"Норма (если есть)\". Проверьте ее существование и корректность написания.")
+            return
 
         self.roughLikenessTable = []
         self.CategoriesClustersTable = []
         self.variantTable = []
+
+        self.outToExcel = outToExcel
+        self.outToJson = outToJson
+
+        self.excelExt = "xlsx"
+        self.jsonExt = "json"
 
     def createRoughLikenessTable(self, FillPercent: int = 40):
         """ Шаг № 1 - получение таблицы ROUGH LIKENESS """
@@ -71,7 +113,8 @@ class KnowledgeExtractor:
             for col in aviableColumns:
                 if col not in self.inputData.keys():
                     logger.warning(
-                        f"Во входных данных не была найдена колонка: \"{col}\". Проверьте ее существование и корректность названия.")
+                        f"Во входных данных не была найдена колонка: \"{col}\". "
+                        f"Проверьте ее существование и корректность названия.")
                     continue
 
                 columnData = self.inputData[col]
@@ -86,44 +129,39 @@ class KnowledgeExtractor:
                 higherItemsKeys = []
                 lowerItemsKeys = []
 
-                if 'Название' not in self.kNameAndNormTable.keys():
-                    logger.error(
-                        f"Завершение работы. В таблице \"Таблица_К_имен_и_норм\" не была найдена колонка: \"Название\". Проверьте ее существование и корректность написания.")
-                    return
-
-                if 'Название' not in self.chNameAndDigitNormTable.keys():
-                    logger.error(
-                        f"Завершение работы. В таблице \"Таблица_Ч_имен_и_числовых_норм\" не была найдена колонка: \"Название\". Проверьте ее существование и корректность написания.")
-                    return
-
                 # если колонка есть в числовых характеристиках
                 if validColumnName in self.chNameAndDigitNorms:
+                    key = [k for k, v in self.chNameAndDigitNormTable['Название'].items() if v == validColumnName][0]
+                    logger.debug(f"validColumnName = {validColumnName}; key = {key}")
+
+                    minValue = self.chNameAndDigitNormTable['Ниж гр нормы'][key]
+                    maxValue = self.chNameAndDigitNormTable['Верх гран нормы'][key]
+                    logger.debug(f"minValue = {minValue}; key = {key}")
+                    logger.debug(f"maxValue = {maxValue}; key = {key}")
+
+                    if not pandas.notna(minValue) or not pandas.notna(maxValue):
+                        logger.warning(
+                                f"Пропускаем, в таблице \"Таблица_Ч_имен_и_числовых_норм\" не было найдено значение: "
+                                f"\"Ниж гр нормы\" для \"{validColumnName}\" (строка {key+2}). "
+                                f"Проверьте корректность значения.")
+                        continue
+
+                    minValue = self.__validateDigitValue(minValue)
+                    maxValue = self.__validateDigitValue(maxValue)
+                    logger.debug(f"minValue = {minValue}; key = {key}")
+                    logger.debug(f"maxValue = {maxValue}; key = {key}")
+
                     for index, currentValue in self.inputData[validColumnName].items():
-                        key = [k for k, v in self.chNameAndDigitNormTable['Название'].items() if v == validColumnName][
-                            0]
-                        # logger.debug(f"validColumnName = {validColumnName}; index = {index}; currentValue = {currentValue}; key = {key}")
-                        if 'Ниж гр нормы' not in self.chNameAndDigitNormTable.keys():
-                            logger.error(
-                                f"Завершение работы. В таблице \"Таблица_Ч_имен_и_числовых_норм\" не была найдена колонка: \"Ниж гр нормы\". Проверьте ее существование и корректность написания.")
-                            return
+                        logger.debug(f"index = {index}; currentValue = {currentValue};")
 
-                        if 'Верх гран нормы' not in self.chNameAndDigitNormTable.keys():
-                            logger.error(
-                                f"Завершение работы. В таблице \"Таблица_Ч_имен_и_числовых_норм\" не была найдена колонка: \"Верх гран нормы\". Проверьте ее существование и корректность написания.")
-                            return
-
-                        minValue = self.chNameAndDigitNormTable['Ниж гр нормы'][key]
-                        maxValue = self.chNameAndDigitNormTable['Верх гран нормы'][key]
-
-                        if not pandas.notna(minValue) or not pandas.notna(maxValue) or not pandas.notna(currentValue):
+                        if not pandas.notna(currentValue):
                             continue
 
                         if isinstance(currentValue, str) and 'нет' in currentValue.lower():
                             continue
 
                         currentValue = self.__validateDigitValue(currentValue)
-                        minValue = self.__validateDigitValue(minValue)
-                        maxValue = self.__validateDigitValue(maxValue)
+                        logger.debug(f"currentValue = {currentValue}; key = {key}")
 
                         if currentValue < minValue:
                             lowerItemsKeys.append(index + 2) # index == 0 это индекс в массиве, +2 что бы он стал как индекс в excel
@@ -134,22 +172,28 @@ class KnowledgeExtractor:
 
                 # если колонка есть в качественных характеристиках
                 elif validColumnName in self.kNamesAndNorms:
+                    key = [k for k, v in self.kNameAndNormTable['Название'].items() if v == validColumnName][0]
+                    logger.debug(f"validColumnName = {validColumnName}; key = {key}")
+
+                    normValue = self.kNameAndNormTable['Норма (если есть)'][key]
+                    logger.debug(f"normValue = {normValue}; key = {key}")
+                    # if not pandas.notna(normValue):
+                    #     logger.warning(
+                    #             f"Пропускаем, в таблице \"Таблица_К_имен_и_норм\" не было найдено значение: \"Норма (если есть)\" для \"{validColumnName}\" (строка {key+2}). "
+                    #             f"Проверьте корректность значения.")
+                    #     continue
                     for index, currentValue in self.inputData[validColumnName].items():
-                        key = [k for k, v in self.kNameAndNormTable['Название'].items() if v == validColumnName][0]
-
-                        if 'Норма (если есть)' not in self.kNameAndNormTable.keys():
-                            logger.error(
-                                f"Завершение работы. В таблице \"Таблица_К_имен_и_норм\" не была найдена колонка: \"Норма (если есть)\". Проверьте ее существование и корректность написания.")
-                            return
-
-                        normValue = self.kNameAndNormTable['Норма (если есть)'][key]
 
                         if not pandas.notna(normValue) or not pandas.notna(currentValue):
                             continue
 
-                        if currentValue not in normValue:
+                        logger.debug(f"currentValue = {currentValue}; key = {key}")
+                        if currentValue.lower() not in normValue:
                             outItemsKeys.append(
                                 index + 2)  # index == 0 это индекс в массиве, +2 что бы он стал как индекс в excel
+
+                            logger.debug(f"\t\tvalidColumnName = {validColumnName}; index = {index}; "
+                                         f"currentValue = {currentValue}; normValue = {normValue}; key = {key}")
                         else:
                             continue
 
@@ -172,11 +216,11 @@ class KnowledgeExtractor:
 
             self.roughLikenessTable = roughLikenessData
 
-            self.__listOfDictToExcel('Output\\RoughLikenessTable.xlsx', self.roughLikenessTable)
+            self.__saveResultToFile('Output\\RoughLikenessTable', self.roughLikenessTable)
 
-            logger.info(f'Таблица ROUGH LIKENESS успешно сформирована')
+            logger.success(f'Таблица ROUGH LIKENESS успешно сформирована')
         except BaseException as e:
-            logger.exception(f'Во время генерации таблицы ROUGH LIKENESS произошла ошибка. Exception: {e}')
+            logger.exception(f'Во время генерации таблицы ROUGH LIKENESS произошла ошибка')
 
     def createSplittingUnNormTable(self, firstPercentBorder: float = 0.02, secondPercentBorder: float = 0.5):
         global maxCategoryAttribute
@@ -190,12 +234,13 @@ class KnowledgeExtractor:
 
         if rowMaxQOut['ObsNm'] in self.kNamesAndNorms:  # Если признак качественный
             """ Шаг № 2.1 """
+            logger.info(f"Шаг №2.1")
             try:
                 CategoriesClustersData = []
                 maxCategoryAttribute = rowMaxQOut['ObsNm']
                 for nRowQQut in rowMaxQOut['Out'].split(','):  # Для каждой строки
                     categories = self.inputData[maxCategoryAttribute][int(nRowQQut) - 2]
-                    # logger.debug(f"categories = {categories}")
+                    logger.debug(f"categories = {categories}")
                     for category in categories.split(','):  # Для каждого значения из перечня;
                         # изменил разделитель с ';' на ',' так как в исх данных не нашёл ни одного применения ';' в качестве разделителя между качественными значениями
 
@@ -220,17 +265,18 @@ class KnowledgeExtractor:
 
                 self.__printTable(CategoriesClustersData)  # Выведи таблицу
                 self.CategoriesClustersTable = CategoriesClustersData  # Сохрани таблицу
-                self.__listOfDictToExcel('Output\\SplittingUnNormCategories.xlsx', self.CategoriesClustersTable)  # Выгрузи таблицу
+                self.__saveResultToFile('Output\\SplittingUnNormCategories', self.CategoriesClustersTable)  # Выгрузи таблицу
 
-                logger.info(f'Таблица SplittingUnNormCategories успешно сформирована (2.1)')
+                logger.success(f'Таблица SplittingUnNormCategories успешно сформирована (2.1)')
             except BaseException as e:
-                logger.exception(f'Во время получения таблицы SplittingUnNormCategories произошла ошибка (2.1). Exception: {e}')
+                logger.exception(f'Во время получения таблицы SplittingUnNormCategories произошла ошибка (2.1)')
 
         if rowMaxNumOut == {}:
             return
 
         if rowMaxNumOut['ObsNm'] in self.chNameAndDigitNorms:  # Если признак числовой
             """ Шаг № 2.2 """
+            logger.info(f"Шаг №2.2")
             try:
                 NumbersClustersData = []
                 validArray = []
@@ -296,11 +342,11 @@ class KnowledgeExtractor:
                 self.__printTable(NumbersClustersData)
 
                 self.NumbersClustersTable = NumbersClustersData
-                self.__listOfDictToExcel('Output\\SplittingUnNormNumbersClusters.xlsx', NumbersClustersData)
+                self.__saveResultToFile('Output\\SplittingUnNormNumbersClusters', NumbersClustersData)
 
-                logger.info(f'Таблица SplittingUnNormNumbersClusters успешно сформирована (2.2)')
+                logger.success(f'Таблица SplittingUnNormNumbersClusters успешно сформирована (2.2)')
             except BaseException as e:
-                logger.exception(f'Во время получения таблицы SplittingUnNormNumbersClusters произошла ошибка (2.2); Exception: {e}')
+                logger.exception(f'Во время получения таблицы SplittingUnNormNumbersClusters произошла ошибка (2.2)')
 
     def _generateVariantTable(self, ClusterTable, maxAttribute):
         cnt = 0
@@ -318,7 +364,7 @@ class KnowledgeExtractor:
                       'Q-Low': '',
                       'list-Low': ''}
         variantRowData = []
-        # logger.debug(f"maxAttribute = {maxAttribute}")
+        logger.debug(f"maxAttribute = {maxAttribute}")
         for row in ClusterTable:  # ДОДЕЛАТЬ чтобы работало с self.NumbersClustersTable:
             cnt += 1
             variantRow['ObsNm'] = maxAttribute  # сделать так, чтобы в соответствии с тем какая таблица
@@ -327,7 +373,7 @@ class KnowledgeExtractor:
             variantRow['Clust-Val'] = row['Val']
             variantRow['Q-Val'] = row['Count']
             variantRow['list-Val'] = row['Out']
-            # logger.debug(f"variantRow = {variantRow}")
+            logger.debug(f"variantRow = {variantRow}")
             variantRowData.append(variantRow)
             variantRow = {'ObsNm': '',
                           'Clust-Val': '',
@@ -350,31 +396,31 @@ class KnowledgeExtractor:
                 if rowRLT['ObsNm'] != maxAttribute:
                     variantRow['ObsNm'] = rowRLT['ObsNm']
 
-                    # logger.debug(f"variantRow = {variantRow}")
+                    logger.debug(f"variantRow = {variantRow}")
                     if rowRLT['Out']:
                         for index in rowRLT['Out'].split(','):
                             if index in row['Out'].split(','):
                                 cnt_out += 1
                                 variantRow['list-Out'] = variantRow['list-Out'] + index + ','
                                 variantRow['Q-Out'] = cnt_out
-                    # logger.debug(f"variantRow = {variantRow}")
+                    logger.debug(f"variantRow = {variantRow}")
                     if rowRLT['Higher']:
                         for index in rowRLT['Higher'].split(','):
                             if index in row['Out'].split(','):
                                 cnt_high += 1
                                 variantRow['list-High'] = variantRow['list-High'] + index + ','
                                 variantRow['Q-High'] = cnt_high
-                    # logger.debug(f"variantRow = {variantRow}")
+                    logger.debug(f"variantRow = {variantRow}")
                     if rowRLT['Lower']:
                         for index in rowRLT['Lower'].split(','):
                             if index in row['Out'].split(','):
                                 cnt_low += 1
                                 variantRow['list-Low'] = variantRow['list-Low'] + index + ','
                                 variantRow['Q-Low'] = cnt_low
-                    # logger.debug(f"variantRow = {variantRow}")
+                    logger.debug(f"variantRow = {variantRow}")
                     if cnt_out + cnt_high + cnt_low != 0:
                         variantRowData.append(variantRow)
-                        # logger.debug(f"variantRow = {variantRow}")
+                        logger.debug(f"variantRow = {variantRow}")
                         variantRow = {'ObsNm': '',
                                       'Clust-Val': '',
                                       'Q-Val': '',
@@ -389,8 +435,8 @@ class KnowledgeExtractor:
             self.variantTable.append(variantRowData)
 
             self.__printTable(variantRowData)
-            self.__listOfDictToExcel(f'Output\\Variant{self.__cleanUpString(maxAttribute)}.{str(cnt)}.xlsx', variantRowData)
-            logger.info(f'Таблица Variant{self.__cleanUpString(maxAttribute)}.{str(cnt)} успешно сформирована')
+            self.__saveResultToFile(f'Output\\Variant{self.__cleanUpString(maxAttribute)}.{str(cnt)}', variantRowData)
+            logger.success(f'Таблица Variant{self.__cleanUpString(maxAttribute)}.{str(cnt)} успешно сформирована')
             variantRowData.clear()
 
     def createVariantTables(self):
@@ -402,9 +448,9 @@ class KnowledgeExtractor:
             self._generateVariantTable(self.CategoriesClustersTable, maxCategoryAttribute)
             self._generateVariantTable(self.NumbersClustersTable, maxNumberAttribute)
 
-            logger.info(f'Все таблицы Variant ({self.__cleanUpString(maxCategoryAttribute)}, {self.__cleanUpString(maxNumberAttribute)}) успешно сформированы')
+            logger.success(f'Все таблицы Variant ({self.__cleanUpString(maxCategoryAttribute)}, {self.__cleanUpString(maxNumberAttribute)}) успешно сформированы')
         except BaseException as e:
-            logger.exception(f'Во время получения таблицы Variant произошла ошибка (3); Exception: {e}')
+            logger.exception(f'Во время получения таблицы Variant произошла ошибка (3)')
 
     def __validateDigitValue(self, digit) -> float:
         if isinstance(digit, (str)):
@@ -441,9 +487,45 @@ class KnowledgeExtractor:
                 nanCount += 1
         return nanCount
 
-    def __listOfDictToExcel(self, filePath, data):
+    def __listOfDictToExcel(self, filePath: str, data):
         output = pandas.DataFrame(data)
         output.to_excel(filePath, index=False)
+        logger.info(f'Excel-файл успешно записан: \"{filePath}\"')
+
+    def __listOfDictToJson(self, filePath: str, data):
+        output = pandas.DataFrame(data).to_dict()
+        with open(filePath, 'w+', encoding='utf-8') as f:
+            json.dump(output, f, ensure_ascii=False, indent=4)
+            #f.write(json.dumps(output, ensure_ascii=False, indent=4))
+        logger.debug(json.dumps(output, ensure_ascii=False, indent=4))
+        logger.info(f'Json-файл успешно записан: \"{filePath}\"')
+        # output.to_json(filePath, index=False)
+
+    def __saveResultToFile(self, filePath: str, data, toExcel = None, toJson = None):
+        if toExcel is None and self.outToExcel:
+            self.__listOfDictToExcel(filePath+"."+self.excelExt, data)
+            # logger.info(f'Excel-файл успешно записан: \"{filePath}\"')
+            noExcel = False
+        elif toExcel:
+            self.__listOfDictToExcel(filePath+"."+self.excelExt, data)
+            # logger.info(f'Excel-файл успешно записан: \"{filePath}\"')
+            noExcel = False
+        else:
+            noExcel = True
+        if toJson is None and self.outToJson:
+            self.__listOfDictToJson(filePath+"."+self.jsonExt, data)
+            # logger.info(f'Json-файл успешно записан: \"{filePath}\"')
+            noJson = False
+        elif toJson:
+            self.__listOfDictToJson(filePath+"."+self.jsonExt, data)
+            # logger.info(f'Json-файл успешно записан: \"{filePath}\"')
+            noJson = False
+        else:
+            noJson = True
+
+        if noExcel and noJson:
+            logger.warning(f'Файл не записан: \"{filePath}\"')
+        return
 
     def __trimDictKeys(self, dictData: dict) -> dict:
         newDict = {}
