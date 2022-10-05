@@ -20,6 +20,7 @@ def initArguments():
     argParser.add_argument('-ch_table', help='Путь до Excel таблицы Ч имен и числовых норм',    type=str, required=False, default=".\\DataSets\\Таблица_Ч_имен_и_числовых_норм.xlsx")
     argParser.add_argument('-input',    help='Путь до Excel таблицы исходных данных',           type=str, required=True)
     argParser.add_argument('-outdir',   help='Путь до директории вывода',                       type=str, required=False, default="Output")
+    argParser.add_argument('-outtype',  help='Тип выходных данных (xlsx, json)', nargs="+",     type=str, required=False, default=["xlsx"])
     args = argParser.parse_args()
     return args
 
