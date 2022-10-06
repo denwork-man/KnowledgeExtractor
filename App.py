@@ -9,7 +9,9 @@ import os
 import argparse
 from KnowledgeExtractor import KnowledgeExtractor as KExtractor
 from loguru import logger
+from typing import List
 
+defaultOutTypes = ['xlsx', 'xls', 'json']
 def initArguments():
     """
     Установка аргументов для путей к таблицам
@@ -25,7 +27,7 @@ def initArguments():
     argParser.add_argument('-ch_table', help='Путь до Excel таблицы Ч имен и числовых норм',    type=str, required=False, default=".\\DataSets\\Таблица_Ч_имен_и_числовых_норм.xlsx")
     argParser.add_argument('-input',    help='Путь до Excel таблицы исходных данных',           type=str, required=True)
     argParser.add_argument('-outdir',   help='Путь до директории вывода',                       type=str, required=False, default="Output")
-    argParser.add_argument('-outtype',  help='Тип выходных данных (xlsx, json)', nargs="+",     type=str, required=False, default=["xlsx"])
+    argParser.add_argument('-outtype',  help=f'Тип выходных данных ({", ".join(defaultOutTypes)})', nargs="+",     type=str, required=False, default=["xlsx"])
     args = argParser.parse_args()
     return args
 
@@ -54,6 +56,24 @@ def isValidResourcesPath(args):
     
     return True
 
+def checkOutTypeList(types: List[str]):
+    typesStr = []
+    if ('xlsx' in types):
+        xlsxIsHere = True
+        typesStr.append('xlsx')
+    elif ('xls' in types):
+        xlsxIsHere = True
+        typesStr.append('xls')
+    jsonIsHere = 'json' in types
+    if jsonIsHere:
+        typesStr.append('json')
+    wrongTypes = []
+    for item in types:
+        if item not in defaultOutTypes:
+            wrongTypes.append(item)
+
+    return (xlsxIsHere,jsonIsHere,typesStr,wrongTypes)
+
 
 # Точка входа приложения
 if __name__ == '__main__':
@@ -75,12 +95,29 @@ if __name__ == '__main__':
             logger.warning("Args is not valid")
             exit()
 
+        if os.path.exists(f"{getFullPath(args.outdir)}") == False:
+            logger.warning(f"Не найден путь вывода: \"{getFullPath(args.outdir)}\"\n"
+                           f"Будет создан")
+        logger.debug(f'Введённые типы данных: {args.outtype}')
+        isExcelTypeSet, isJsonTypeSet, TypesStr, WrongTypes = checkOutTypeList(args.outtype)
+        if (isExcelTypeSet or isJsonTypeSet) is False:
+            logger.error(f'Не выбран корректный тип выходных файлов! Выбраны: {", ".join(args.outtype)}. '
+                         f'Допустимые: {", ".join(defaultOutTypes)}. Будет выбран по умолчанию \"xlsx\".')
+        else:
+            logger.info(f'Выбран тип(ы): {", ".join(TypesStr)}')
+
+        if len(WrongTypes) != 0:
+            logger.warning(f'Указаны неподходящие типы файлов: {", ".join(WrongTypes)}')
+
         kExtractor = KExtractor(
             inputFilePath=getFullPath(args.input),
             fTableFilePath=getFullPath(args.f_table),
             kTableFilePath=getFullPath(args.k_table),
             bTableFilePath=getFullPath(args.b_table),
             chTableFilePath=getFullPath(args.ch_table),
+            outputDirPath=getFullPath(args.outdir),
+            outToExcel = isExcelTypeSet,
+            outToJson = isJsonTypeSet
         )
         # Шаг № 1
         logger.info(f"Шаг №1")

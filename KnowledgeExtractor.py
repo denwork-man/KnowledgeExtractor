@@ -579,6 +579,7 @@ class KnowledgeExtractor:
         return rowMaxQOut, rowMaxNumOut, isQ_Higher
 
     def __printTable(self, table):
+        print('Row NUM: Row content')
         for nomRow in range(len(table)):
             print("{0}:{1}".format(nomRow, table[nomRow]))
 
