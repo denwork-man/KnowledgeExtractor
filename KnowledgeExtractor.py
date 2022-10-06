@@ -345,7 +345,6 @@ class KnowledgeExtractor:
 
                 self.NumbersClustersTable = NumbersClustersData
                 self.__saveResultToFile('Output\\SplittingUnNormNumbersClusters', NumbersClustersData)
-
                 logger.success(f'Таблица SplittingUnNormNumbersClusters успешно сформирована (2.2)')
             except BaseException as e:
                 logger.exception(f'Во время получения таблицы SplittingUnNormNumbersClusters произошла ошибка (2.2)')

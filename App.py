@@ -12,22 +12,26 @@ from loguru import logger
 from typing import List
 
 defaultOutTypes = ['xlsx', 'xls', 'json']
+isDebugEnabled = False
 def initArguments():
     """
     Установка аргументов для путей к таблицам
     """
-    argParser = argparse.ArgumentParser()
+    argParser = argparse.ArgumentParser(description='Извлечение "знаний" на основе входных данных и справочных материалов',
+                                        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     argParser.add_argument('-?',        help='Вывод справочной информации о доступных параметрах', action='help')
-    argParser.add_argument('-DEBUG',    help='Указание для вывода отладочной информации во время выполнения', type=bool, default=False, required=False)
+    #argParser.add_argument('-DEBUG',    help='Указание для вывода отладочной информации во время выполнения', type=bool, default=False, required=False)
     argParser.add_argument('-v',
-                           '--verbose', help='Уровень вывода сообщений (либо "DEBUG", либо не указывать)', type=str, default='INFO')
+                           '--verbose', help='Уровень вывода сообщений ("DEBUG","INFO","SUCCESS","WARNING","ERROR","CRITICAL")', type=str, default='INFO')
     argParser.add_argument('-f_table',  help='Путь до Excel таблицы Ф имен',                    type=str, required=False, default=".\\DataSets\\Таблица_Ф_имен.xlsx")
     argParser.add_argument('-k_table',  help='Путь до Excel таблицы К имен и норм',             type=str, required=False, default=".\\DataSets\\Таблица_К_имен_и_норм.xlsx")
     argParser.add_argument('-b_table',  help='Путь до Excel таблицы Б временных характеристик', type=str, required=False, default=".\\DataSets\\Таблица_В_временных_характеристик.xlsx")
     argParser.add_argument('-ch_table', help='Путь до Excel таблицы Ч имен и числовых норм',    type=str, required=False, default=".\\DataSets\\Таблица_Ч_имен_и_числовых_норм.xlsx")
-    argParser.add_argument('-input',    help='Путь до Excel таблицы исходных данных',           type=str, required=True)
+
     argParser.add_argument('-outdir',   help='Путь до директории вывода',                       type=str, required=False, default="Output")
-    argParser.add_argument('-outtype',  help=f'Тип выходных данных ({", ".join(defaultOutTypes)})', nargs="+",     type=str, required=False, default=["xlsx"])
+    argParser.add_argument('-outtype',  help=f'Тип выходных данных ({", ".join(defaultOutTypes)})', nargs="+", type=str, required=False, default=["xlsx"])
+    argParser.add_argument('input', help='Путь до Excel таблицы исходных данных', type=str)
+    argParser.add_argument('-input', help='Путь до Excel таблицы исходных данных', type=str, required=False)
     args = argParser.parse_args()
     return args
 
@@ -58,6 +62,7 @@ def isValidResourcesPath(args):
 
 def checkOutTypeList(types: List[str]):
     typesStr = []
+    xlsxIsHere = False
     if ('xlsx' in types):
         xlsxIsHere = True
         typesStr.append('xlsx')
@@ -74,25 +79,46 @@ def checkOutTypeList(types: List[str]):
 
     return (xlsxIsHere,jsonIsHere,typesStr,wrongTypes)
 
-
 # Точка входа приложения
 if __name__ == '__main__':
     try:
         args = initArguments()
         logger.info(f'KnowledgeExtractor запускается. Сейчас всё начнётся.')
-
-        if isinstance(args.verbose, (str)) and args.verbose in "DEBUG":
+        if "DEBUG" in args.verbose:
             logger.remove()
             logger.add(sys.stdout, level="DEBUG")
+            isDebugEnabled = True
+        elif ("SUCCESS" in args.verbose):
+            logger.remove()
+            logger.add(sys.stdout, level="SUCCESS")
+            logger.debug(f'Включен вывод {args.verbose} сообщений')
+        elif ("ERROR" in args.verbose):
+            logger.remove()
+            #addVerboseList(args.verbose)
+            logger.add(sys.stdout, level="ERROR")
+            logger.debug(f'Включен вывод {args.verbose} сообщений')
+        elif ("CRITICAL" in args.verbose):
+            logger.remove()
+            #addVerboseList(args.verbose)
+            logger.add(sys.stdout, level="CRITICAL")
+            logger.debug(f'Включен вывод {args.verbose} сообщений')
         else:
             logger.remove()
             logger.add(sys.stdout, level=args.verbose)
             logger.info(f'Включен вывод {args.verbose} сообщений')
 
         logger.debug(f'Включен вывод сообщений отладки')
+        # Вывод полученных параметров, если Debug
+        if isDebugEnabled:
+            value = []
+            for item in args.__dict__.items():
+                value.append(f'{item[0]}: {str(item[1])}')
+            logger.debug('Получены следующие параметры (некоторые значения даны поумолчанию): \n' +
+                         "\n".join(value))
+
         isValidArgs = isValidResourcesPath(args)
         if isValidArgs == False:
-            logger.warning("Args is not valid")
+            logger.error("Args is not valid")
             exit()
 
         if os.path.exists(f"{getFullPath(args.outdir)}") == False:
@@ -137,7 +163,7 @@ if __name__ == '__main__':
         pass
     except BaseException as e:
         logger.exception(f'Во время работы приложения произошла непредвиденная ошибка')
-        raise e
+
 
 # Строка запуска программы в консоли
 # python App.py -f_table DataSets\Таблица_Ф_имен.xlsx -k_table DataSets\Таблица_К_имен_и_норм.xlsx -b_table DataSets\Таблица_В_временных_характеристик.xlsx -ch_table DataSets\Таблица_Ч_имен_и_числовых_норм.xlsx -input DataSets\Пример_исх_данных_для_ВГУ_v2.xls
