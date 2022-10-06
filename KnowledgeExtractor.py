@@ -30,7 +30,7 @@ class KnowledgeExtractor:
             logger.info(f'Входные файлы успешно считаны')
         except BaseException as e:
             logger.exception(f'Во время чтения данных с файлов произошла ошибка')
-            return
+            raise e
 
         try:
             path = pathlib.Path(outputDirPath)
@@ -39,7 +39,7 @@ class KnowledgeExtractor:
             path.mkdir(parents=True, exist_ok=True)
         except BaseException as e:
             logger.exception(f'Во время создания выходного каталога произошла ошибка')
-            return
+            raise e
 
         if 'Название' not in self.kNameAndNormTable.keys():
             logger.error(
@@ -221,6 +221,7 @@ class KnowledgeExtractor:
             logger.success(f'Таблица ROUGH LIKENESS успешно сформирована')
         except BaseException as e:
             logger.exception(f'Во время генерации таблицы ROUGH LIKENESS произошла ошибка')
+            raise e
 
     def createSplittingUnNormTable(self, firstPercentBorder: float = 0.02, secondPercentBorder: float = 0.5):
         global maxCategoryAttribute
@@ -270,6 +271,7 @@ class KnowledgeExtractor:
                 logger.success(f'Таблица SplittingUnNormCategories успешно сформирована (2.1)')
             except BaseException as e:
                 logger.exception(f'Во время получения таблицы SplittingUnNormCategories произошла ошибка (2.1)')
+                raise e
 
         if rowMaxNumOut == {}:
             return
@@ -347,6 +349,7 @@ class KnowledgeExtractor:
                 logger.success(f'Таблица SplittingUnNormNumbersClusters успешно сформирована (2.2)')
             except BaseException as e:
                 logger.exception(f'Во время получения таблицы SplittingUnNormNumbersClusters произошла ошибка (2.2)')
+                raise e
 
     def _generateVariantTable(self, ClusterTable, maxAttribute):
         cnt = 0
@@ -451,6 +454,7 @@ class KnowledgeExtractor:
             logger.success(f'Все таблицы Variant ({self.__cleanUpString(maxCategoryAttribute)}, {self.__cleanUpString(maxNumberAttribute)}) успешно сформированы')
         except BaseException as e:
             logger.exception(f'Во время получения таблицы Variant произошла ошибка (3)')
+            raise e
 
     def __validateDigitValue(self, digit) -> float:
         if isinstance(digit, (str)):

@@ -1,4 +1,9 @@
 #!/usr/bin/python
+"""
+dependencie:
+            xlrd for reading XLSX-files
+            openpyxl
+"""
 import sys
 import os
 import argparse
@@ -95,7 +100,7 @@ if __name__ == '__main__':
         pass
     except BaseException as e:
         logger.exception(f'Во время работы приложения произошла непредвиденная ошибка')
-
+        raise e
 
 # Строка запуска программы в консоли
 # python App.py -f_table DataSets\Таблица_Ф_имен.xlsx -k_table DataSets\Таблица_К_имен_и_норм.xlsx -b_table DataSets\Таблица_В_временных_характеристик.xlsx -ch_table DataSets\Таблица_Ч_имен_и_числовых_норм.xlsx -input DataSets\Пример_исх_данных_для_ВГУ_v2.xls
